@@ -14,6 +14,7 @@ const log = (...args) => {
 };
 
 const files = [];
+const failedTasks = [];
 
 const getFiles = (address) => {
     const list = fs.readdirSync(address, { withFileTypes: true });
@@ -26,7 +27,8 @@ const getFiles = (address) => {
     }
 };
 
-const upload = async ({ url, parentDirectory, file, index }) => {
+const upload = async (task) => {
+    const { url, parentDirectory, file, index } = task;
     console.log(
         VIDEO_LOCAL_DIRECTORY,
         DEST_PARENT_DIRECTORY,
@@ -43,6 +45,9 @@ const upload = async ({ url, parentDirectory, file, index }) => {
         .field("parentDirectory", parentDirectory);
     log(file);
     console.log(req?.body || "Unexpected Error");
+    if (!req?.body) {
+        failedTasks.push(task);
+    }
 };
 
 const input = () => {
@@ -108,6 +113,10 @@ const main = async () => {
         await Promise.all(
             tasks.slice(startIndex, endIndex).map((task) => upload(task))
         );
+    }
+    while (failedTasks.length > 0) {
+        const task = failedTasks.pop();
+        await upload(task);
     }
     log("all done");
 };
