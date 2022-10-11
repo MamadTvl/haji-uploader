@@ -1,13 +1,13 @@
-let VIDEO_LOCAL_DIRECTORY = "";
-let DEST_PARENT_DIRECTORY = "";
-let UPLOAD_URL = "";
-let COUNT_OF_SYNC_TASKS = 5;
-let API_KEY = "";
-
 const fs = require("fs");
 const unirest = require("unirest");
 const readline = require("readline");
 const { exit } = require("process");
+require("dotenv").config();
+let VIDEO_LOCAL_DIRECTORY = process.env.VIDEO_LOCAL_DIRECTORY || "";
+let UPLOAD_URL = process.env.UPLOAD_URL || "";
+let COUNT_OF_SYNC_TASKS = +process.env.COUNT_OF_SYNC_TASKS || "";
+let API_KEY = process.env.API_KEY || "";
+let SETTING = process.env.SETTING || "";
 
 const log = (...args) => {
     console.log(new Date(), ...args);
@@ -28,21 +28,15 @@ const getFiles = (address) => {
 };
 
 const upload = async (task) => {
-    const { url, parentDirectory, file, index } = task;
-    console.log(
-        VIDEO_LOCAL_DIRECTORY,
-        DEST_PARENT_DIRECTORY,
-        UPLOAD_URL,
-        COUNT_OF_SYNC_TASKS,
-        API_KEY
-    );
+    const { url, parentDirectory, file, index, setting } = task;
     log(`${index}/${files.length}`, "uploading " + file);
     var req = await unirest("POST", `${url}/task`)
         .headers({
-            Authorization: API_KEY,
+            apiKey: API_KEY,
         })
         .attach("video", file)
-        .field("parentDirectory", parentDirectory);
+        .field("parentDirectory", parentDirectory)
+        .field("setting", setting);
     log(file);
     console.log(req?.body || "Unexpected Error");
     if (!req?.body) {
@@ -70,14 +64,42 @@ const main = async () => {
     // set config
     console.log("Haji!");
     try {
-        console.log("enter local videos directory: ");
-        VIDEO_LOCAL_DIRECTORY = await input();
-        console.log("enter count of sync tasks: ");
-        COUNT_OF_SYNC_TASKS = await input();
-        console.log("enter encoder url with [https://encoder.example.com]: ");
-        UPLOAD_URL = await input();
-        console.log("enter your api key: ");
-        API_KEY = await input();
+        if (VIDEO_LOCAL_DIRECTORY === "") {
+            console.log("enter local videos directory: ");
+            VIDEO_LOCAL_DIRECTORY = await input();
+        }
+        if (COUNT_OF_SYNC_TASKS === "") {
+            console.log("enter count of sync tasks: ");
+            COUNT_OF_SYNC_TASKS = await input();
+        }
+        if (UPLOAD_URL === "") {
+            console.log(
+                "enter encoder url with [https://encoder.example.com]: "
+            );
+            UPLOAD_URL = await input();
+        }
+        if (API_KEY === "") {
+            console.log("enter your api key: ");
+            API_KEY = await input();
+        }
+        if (SETTING === "") {
+            console.log("getting available settings ...");
+            const req = await unirest(
+                "GET",
+                `${UPLOAD_URL}/setting/all`
+            ).headers({
+                apiKey: API_KEY,
+            });
+            const response = req.body;
+            if (!response.data) {
+                console.log(req.body);
+                exit(1);
+            }
+            const settingNames = response.data.map((item) => item.serviceName);
+            console.log(`available settings are: ${settingNames.join(" | ")}`);
+            console.log(`enter setting name`);
+            SETTING = await input();
+        }
     } catch (err) {
         console.log(err.message);
     }
@@ -94,6 +116,7 @@ const main = async () => {
             parentDirectory: path,
             url: UPLOAD_URL,
             index: index,
+            setting: SETTING,
         });
         index++;
     }
